@@ -1,0 +1,42 @@
+Aufbau der Pakete:
+    Name ist immer nullterminiert und UTF8.
+    m-Präfix heißt Multicast.
+    Bitfolge ist nach folgendem Muster:
+        Das erste Bit gibt an, ob die geladenen oder ungeladenen Chunks 1 sind. Des-
+        weiteren bricht die Reihe ab, wenn alles weitere den Wert 0 hat.
+        Beispiele:
+            - vollständig geladen: 00000000 (geladen ist 0, alles weitere 0)
+            - die ersten vier Stücke geladen: 11111000, 0xf8 (geladen ist 1)
+            - abwechselnd die ersten 10: 11010101 01000000, 0xd5 0x80
+
+m(I_HAVE, Hash, Name, Größe, Bitfolge)
+    m(I_PROVIDE, Hash, Nummer)
+        (OK, Hash, Nummer)
+            (DATA, Hash, Nummer)
+m(I_SEEK, Name)
+    I_HAVE
+m(YOU_COLLIDE, Name)
+m(I_WANT, Hash, Bitfolge)
+    I_PROVIDE
+
+1. Start:
+    1.1. Registriere Datei mit network::register(path&) oder network::register(file&)
+    1.2. Berechne Hash
+    1.3. Sende I_HAVE mit der Bitfolge 0x0
+
+2. Suchen:
+    2.1. Sende I_SEEK. Falls Name leer ist (also Länge 0), dann antworten alle.
+         Bei Kollisionen sende YOU_COLLIDE und ignoriere diesen Namen, bis wieder
+         ein eindeutiges I_HAVE kommt. Die Bitfolgen werden ausgewertet. Kommt
+         insgesamt keine gesamte Datei zusammen, so wird diese nicht weiter aufge-
+         führt.
+    2.2. Falls der Name nicht leer ist werden nur die Antworten bzgl. Name gesendet,
+         ansonsten wie zuvor.
+
+3. Download:
+    3.1. Sende I_WANT mit dem Hash aus 2. und der Nummer des gewünschten Teilstückes.
+
+
+ 
+3. Die network-Instanz gibt der Datei einen oder mehrere Slots (je nach Kapazität)
+
