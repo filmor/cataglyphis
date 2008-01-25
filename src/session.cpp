@@ -1,12 +1,14 @@
 #include "session.hpp"
+#include "torrent_provider.hpp"
 
 #include <sstream>
 #include <iomanip>
 
 #include <unistd.h>
 
+#include <libtorrent/torrent_info.hpp>
 #include <libtorrent/fingerprint.hpp>
-#include <libtorrent/extensions/metadata_transfer.hpp>
+#include <libtorrent/extensions/ut_metadata.hpp>
 #include <libtorrent/extensions/ut_pex.hpp>
 
 #include <boost/filesystem/operations.hpp>
@@ -60,19 +62,50 @@ namespace cataglyphis
         }
     }
 
+    class session::provided_torrent
+    {
+    public:
+        provided_torrent (std::string name, lt::torrent_info info, lt::session& s,
+                          asio::io_service& ios)
+            : _info (info), _provider (info, ios), _session (s)
+              , _registerer ("cataglyphis", transport::tcp, name,
+                             s.listen_port (), bignum_to_string (info.info_hash())
+                            )
+        {
+            s.add_torrent (&_info, name);
+        }
+
+        ~provided_torrent ()
+        {
+            /// \todo s.delete_torrent ()
+        }
+
+    private:
+        lt::session& _session;
+        service_registerer _registerer;
+        lt::torrent_info _info;
+        torrent_provider _provider;
+    };
+
     session::session ()
         : _session (lt::fingerprint ("CG", 3, 1, 4, 1), std::make_pair (6300, 6400))
     {
+        /// \todo
+        lt::dht_settings settings;
+        settings.service_port = _session.listen_port () + 1;
+        _session.set_dht_settings (settings);
         _session.start_dht ();
-        _session.add_extension (&lt::create_metadata_plugin);
+        _session.add_extension (&lt::create_ut_metadata_plugin);
         _session.add_extension (&lt::create_ut_pex_plugin);
     }
 
+    /// \todo Torrent provider
     void session::put_element (session::path_type const& path)
     {
         std::string name = path.leaf ();
         lt::torrent_info info;
 
+        /// \todo
         if (bf::is_directory (path))
             return;
 
@@ -82,16 +115,15 @@ namespace cataglyphis
 
         try
         {
-            _registry.push_back(
-                    service_registerer ("cataglyphis", transport::tcp, name,
-                        _session.listen_port (), bignum_to_string (info.info_hash())
-                        )
+            _registry.push_back (
+                    torrent_ptr (new provided_torrent (name, info, _session, _ios))
                     );
-            info.print (std::cout);
-            _session.add_torrent (info, path);
+
+//            info.print (std::cout);
         }
         catch (already_registered const& exc)
         {
+            /// \todo
             throw exc;
         }
     }
@@ -104,13 +136,11 @@ namespace cataglyphis
 
         DEBUG_OUT(result.port);
 
-        _session.add_dht_node (std::make_pair (result.host,
-                                               result.port)
-                );
+        _session.add_dht_node (std::make_pair (result.host, result.port));
 
         DEBUG_OUT(_session.dht_state ());
 
-        lt::sha1_hash info_hash = string_to_bignum (result.txt_record);
+        lt::sha1_hash info_hash = string_to_bignum (result.txt_record["hash"]);
         DEBUG_OUT(bignum_to_string(info_hash));
         _session.add_torrent ("", info_hash, name.c_str (), path);
 

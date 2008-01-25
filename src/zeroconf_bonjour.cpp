@@ -1,6 +1,7 @@
 #include "zeroconf.hpp"
 
 #include <sstream>
+#include <iterator>
 #include <iostream>
 
 #include <boost/preprocessor/stringize.hpp>
@@ -74,14 +75,23 @@ namespace cataglyphis
             service_record& result = this_->_service_record;
             this_->_error_code = error;
 
-            DEBUG_OUT(error);
+            // DEBUG_OUT(error);
 
             if (error)
                 return;
 
+            DEBUG_OUT(error);
+            DEBUG_OUT(error);
+
             result.port = port;
+            DEBUG_OUT(port);
             result.host = std::string (hosttarget);
-            deserialize (txt_record, txt_len, std::back_inserter (result.txt_record.begin ()));
+            deserialize_txt (
+                txt_record, txt_record + txt_len, 
+                std::inserter (result.txt_record, result.txt_record.end ())
+                );
+            DEBUG_OUT(port);
+            DEBUG_OUT(result.host);
         }
 
         DNSServiceRef _sdref;

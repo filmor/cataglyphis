@@ -25,8 +25,13 @@ namespace cataglyphis
         std::vector<std::string> available_elements () const;
 
     private:
+        struct provided_torrent;
+        typedef boost::shared_ptr<provided_torrent> torrent_ptr;
+
+        asio::io_service _ios;
+
         ::libtorrent::session _session;
-        std::vector<service_registerer> _registry;
+        std::vector<torrent_ptr> _registry;
     };
 
 }

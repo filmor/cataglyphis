@@ -5,10 +5,17 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <sstream>
+#include <iostream>
 
 #include <boost/cstdint.hpp>
 #include <boost/shared_ptr.hpp>
 #include <asio/ip/address.hpp>
+
+#include <boost/preprocessor/stringize.hpp>
+
+#define DEBUG_OUT(expr) \
+    std::cout << BOOST_PP_STRINGIZE(expr) << ": " << (expr) << std::endl;
 
 namespace cataglyphis
 {
@@ -39,34 +46,24 @@ namespace cataglyphis
         return os.str ();
     }
 
-    namespace
-    {
-        template <typename InIt>
-        std::string::size_type get_int (InIt& i)
-        {
-            std::string::size_type result = 0;
-            InIt start = i;
-            if (!isdigit (*i))
-                throw std::exception ("W00t, NO INT!!1")
-            while (isdigit (*i))
-            {
-                (result *= 10) += *i - '0'
-                ++i;
-            }
-            return result;
-        }
-    }       
-
     template <typename InIt, typename OutIt>
-    void deserialize_txt (InIt begin, InIt end, OutIt out)
+    void deserialize_txt (InIt i, InIt end, OutIt out)
     {
-        while (begin != end)
+        while (i != end)
         {
-            std::string::size_type len = get_int (i);
-            std::string key (i, i + len);
-            len = get_int (i);
-            std::string value (i, i + len);
-            (out++) = std::pair<std::string, std::string> (key, value);
+            std::string::size_type len = static_cast<std::string::size_type> (*i++);
+            
+            InIt begin = i;
+            InIt local_end = i + len;
+
+            for (; i != local_end; ++i)
+                if (*i == '=')
+                    break;
+
+            (out++) = std::make_pair (std::string (begin, i)
+                                     ,std::string (i + 1, local_end)
+                                );
+            i = local_end;
         }
     }
 

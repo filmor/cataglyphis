@@ -5,6 +5,35 @@
 namespace cataglyphis
 {
 
+    class torrent_provider::connection 
+        : public boost::enable_shared_from_this<torrent_provider::connection>
+    {
+    public:
+        typedef boost::shared_ptr<connection> pointer;
+        
+        static pointer create (asio::io_service& ios, std::string const& tor)
+        {
+            return pointer (new connection (ios, tor));
+        }
+
+        asio::ip::tcp::socket& socket ()
+        {
+            return _socket; 
+        }
+
+        void start ();
+
+    private:
+        connection (asio::io_service& ios, std::string const& tor)
+            :  _socket (ios), _torrent (tor)
+        {}
+
+        void handle_write () const {}
+
+        asio::ip::tcp::socket _socket;
+        std::string const& _torrent;
+    };
+
     torrent_provider::torrent_provider (libtorrent::torrent_info const& tor,
                                         asio::io_service& ios)
         : _torrent (tor), _acceptor (ios), _io_service (ios)
@@ -21,7 +50,7 @@ namespace cataglyphis
     void torrent_provider::start_accept ()
     {
         connection::pointer new_connection
-            = connection::create (_io_service, _torrent.create_torrent ());
+            = connection::create (_io_service, _torrent.create_torrent ().string ());
 
         _acceptor.async_accept (new_connection->socket (),
                 boost::bind (&torrent_provider::handle_accept, this, new_connection,
