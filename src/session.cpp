@@ -6,7 +6,7 @@
 
 #include <unistd.h>
 
-#include <libtorrent/torrent_info.hpp>
+#include <libtorrent/create_torrent.hpp>
 #include <libtorrent/fingerprint.hpp>
 #include <libtorrent/extensions/ut_metadata.hpp>
 #include <libtorrent/extensions/ut_pex.hpp>
@@ -65,14 +65,17 @@ namespace cataglyphis
     class session::provided_torrent
     {
     public:
-        provided_torrent (std::string name, lt::torrent_info info, lt::session& s,
-                          asio::io_service& ios)
-            : _info (info), _provider (info, ios), _session (s)
-              , _registerer ("cataglyphis", transport::tcp, name,
+        provided_torrent (bf::path path, lt::torrent_info info, lt::session& s,
+                          boost::asio::io_service& ios)
+            : provider_ (info, ios)
+            , registerer_ ("cataglyphis", transport::tcp, path.leaf (),
                              s.listen_port (), bignum_to_string (info.info_hash())
                             )
         {
-            s.add_torrent (&_info, name);
+            lt::add_torrent_params p;
+            p.ti = &info;
+            p.save_path = path;
+            handle_ = s.add_torrent (p);
         }
 
         ~provided_torrent ()
@@ -81,45 +84,38 @@ namespace cataglyphis
         }
 
     private:
-        lt::session& _session;
-        service_registerer _registerer;
-        lt::torrent_info _info;
-        torrent_provider _provider;
+        lt::torrent_handle handle_;
+        torrent_provider provider_;
+        service_registerer registerer_;
     };
 
     session::session ()
-        : _session (lt::fingerprint ("CG", 3, 1, 4, 1), std::make_pair (6300, 6400))
+        : session_ (lt::fingerprint ("CG", 3, 1, 4, 1), std::make_pair (6300, 6400))
     {
         /// \todo
         lt::dht_settings settings;
-        settings.service_port = _session.listen_port () + 1;
-        _session.set_dht_settings (settings);
-        _session.start_dht ();
-        _session.add_extension (&lt::create_ut_metadata_plugin);
-        _session.add_extension (&lt::create_ut_pex_plugin);
+        settings.service_port = session_.listen_port () + 1;
+        session_.set_dht_settings (settings);
+        session_.start_dht ();
+        session_.add_extension (&lt::create_ut_metadata_plugin);
+        session_.add_extension (&lt::create_ut_pex_plugin);
     }
 
     /// \todo Torrent provider
     void session::put_element (session::path_type const& path)
     {
-        std::string name = path.leaf ();
-        lt::torrent_info info;
+        lt::file_storage fs;
+        fs.set_piece_length (1000);
 
-        /// \todo
-        if (bf::is_directory (path))
-            return;
+        fs.add_file (path, bf::file_size (path));
 
-        info.add_file (path, bf::file_size(path));
-
-        info.create_torrent ();
+        lt::torrent_info info (lt::create_torrent (fs).generate ());
 
         try
         {
-            _registry.push_back (
-                    torrent_ptr (new provided_torrent (name, info, _session, _ios))
+            registry_.push_back (
+                    torrent_ptr (new provided_torrent (path, info, session_, ios_))
                     );
-
-//            info.print (std::cout);
         }
         catch (already_registered const& exc)
         {
@@ -136,19 +132,19 @@ namespace cataglyphis
 
         DEBUG_OUT(result.port);
 
-        _session.add_dht_node (std::make_pair (result.host, result.port));
+        session_.add_dht_node (std::make_pair (result.host, result.port));
 
-        DEBUG_OUT(_session.dht_state ());
+        DEBUG_OUT(session_.dht_state ());
 
         lt::sha1_hash info_hash = string_to_bignum (result.txt_record["hash"]);
         DEBUG_OUT(bignum_to_string(info_hash));
-        _session.add_torrent ("", info_hash, name.c_str (), path);
+        session_.add_torrent ("", info_hash, name.c_str (), path);
 
-        _session.set_severity_level (libtorrent::alert::debug);
+        session_.set_severity_level (libtorrent::alert::debug);
 
         while (true)
         {
-            std::auto_ptr<lt::alert> a = _session.pop_alert ();
+            std::auto_ptr<lt::alert> a = session_.pop_alert ();
             if (a.get () != 0)
                 DEBUG_OUT(a->msg ());
             ::usleep (1000000);

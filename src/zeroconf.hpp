@@ -10,7 +10,7 @@
 
 #include <boost/cstdint.hpp>
 #include <boost/shared_ptr.hpp>
-#include <asio/ip/address.hpp>
+#include <boost/asio/ip/address.hpp>
 
 #include <boost/preprocessor/stringize.hpp>
 

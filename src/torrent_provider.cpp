@@ -1,5 +1,6 @@
 #include "torrent_provider.hpp"
 
+#include <iterator>
 #include <boost/bind.hpp>
 
 namespace cataglyphis
@@ -11,55 +12,55 @@ namespace cataglyphis
     public:
         typedef boost::shared_ptr<connection> pointer;
         
-        static pointer create (asio::io_service& ios, std::string const& tor)
+        static pointer create (boost::asio::io_service& ios, std::string const& tor)
         {
             return pointer (new connection (ios, tor));
         }
 
-        asio::ip::tcp::socket& socket ()
+        boost::asio::ip::tcp::socket& socket ()
         {
-            return _socket; 
+            return socket_; 
         }
 
         void start ();
 
     private:
-        connection (asio::io_service& ios, std::string const& tor)
-            :  _socket (ios), _torrent (tor)
+        connection (boost::asio::io_service& ios, std::string const& tor)
+            :  socket_ (ios), torrent_ (tor)
         {}
 
         void handle_write () const {}
 
-        asio::ip::tcp::socket _socket;
-        std::string const& _torrent;
+        boost::asio::ip::tcp::socket socket_;
+        std::string const& torrent_;
     };
 
     torrent_provider::torrent_provider (libtorrent::torrent_info const& tor,
-                                        asio::io_service& ios)
-        : _torrent (tor), _acceptor (ios), _io_service (ios)
+                                        boost::asio::io_service& ios)
+        : acceptor_ (ios), io_service_ (ios), torrent_ (tor.metadata ().get ())
     {
-        /// Initiiere _acceptor
+        /// Initiiere acceptor_
         start_accept ();
     }
 
     boost::uint16_t torrent_provider::port () const
     {
-        return _acceptor.local_endpoint ().port ();
+        return acceptor_.local_endpoint ().port ();
     }
 
     void torrent_provider::start_accept ()
     {
         connection::pointer new_connection
-            = connection::create (_io_service, _torrent.create_torrent ().string ());
+            = connection::create (io_service_, torrent_);
 
-        _acceptor.async_accept (new_connection->socket (),
+        acceptor_.async_accept (new_connection->socket (),
                 boost::bind (&torrent_provider::handle_accept, this, new_connection,
-                asio::placeholders::error)
+                boost::asio::placeholders::error)
                 );
     }
 
     void torrent_provider::handle_accept (connection::pointer new_connection,
-                                          asio::error_code const& error)
+                                          boost::system::error_code const& error)
     {
         if (!error)
         {
@@ -70,7 +71,7 @@ namespace cataglyphis
 
     void torrent_provider::connection::start ()
     {
-        asio::async_write (_socket, asio::buffer (_torrent),
+        boost::asio::async_write (socket_, boost::asio::buffer (torrent_),
                 boost::bind (&connection::handle_write, shared_from_this ())
                 );
     }

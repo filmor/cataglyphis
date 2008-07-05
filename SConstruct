@@ -8,11 +8,11 @@ name = "cataglyphis"
 sources = glob.glob('src/*.cpp')
 prefix = "/Users/bs/Gentoo/usr"
 libdir = [ '.', join(prefix, "lib") ]
-include = [ join(i, "include") for i in ["/usr", prefix, "asio", "libtorrent"] ]
-libs = "boost_thread boost_filesystem torrent-0.13".split()
-cxxflags = "-Wall -g3 -fomit-frame-pointer -march=k8" # -D_GLIBCXX_CONCEPT_CHECKS"
+include = [ join(i, "include") for i in ["/usr", prefix, "libtorrent"] ]
+libs = "boost_system boost_thread boost_filesystem torrent".split()
+cxxflags = "-Wall -g3 -fomit-frame-pointer -march=k8"# -D_GLIBCXX_CONCEPT_CHECKS"
 
-ldflags = "".split ()
+ldflags = "-bind_at_load".split ()
 
 env = Environment(CXXFLAGS=cxxflags, CPPPATH=include, LIBPATH=libdir, LIBS=libs, LINKFLAGS = ldflags)
 

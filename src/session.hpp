@@ -5,6 +5,7 @@
 
 #include <libtorrent/session.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/asio/io_service.hpp>
 
 #include <string>
 #include <vector>
@@ -28,10 +29,10 @@ namespace cataglyphis
         struct provided_torrent;
         typedef boost::shared_ptr<provided_torrent> torrent_ptr;
 
-        asio::io_service _ios;
+        boost::asio::io_service ios_;
 
-        ::libtorrent::session _session;
-        std::vector<torrent_ptr> _registry;
+        ::libtorrent::session session_;
+        std::vector<torrent_ptr> registry_;
     };
 
 }
